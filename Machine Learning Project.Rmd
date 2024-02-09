@@ -1,0 +1,639 @@
+---
+title: "Machine Learning Project"
+author: "Garrett Atkinson"
+date: "2023-09-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+Preparation:
+```{r}
+library(readxl)
+library(ggplot2)
+library(randomForest)
+qb_data_rough <- read_excel("Machine Learning Project Data Cleaned.xlsx")
+qb_data <- qb_data_rough[,-c(1,15)]
+qb_data$home_away <- as.integer(as.factor(qb_data$home_away))
+head(qb_data)
+```
+
+Test and Training Data:
+```{r}
+set.seed(111111)
+qb_sample <- sample(c(TRUE, FALSE), nrow(qb_data), replace = TRUE, prob = c(0.8, 0.2))
+qb_train <- qb_data[qb_sample, ]
+qb_test <- qb_data[!qb_sample, ]
+```
+
+
+
+First, I decided to do some standard analysis of variables I initially thought would provide the most significance:
+
+Density Plot of Passing Yards
+```{r}
+g_1 <- ggplot(qb_data, aes(x = yds)) + # Set X-axis as insurance charges
+  geom_density(fill = "blue", alpha = 0.3) + # Use geom_density to get density plot
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(x = "Passing Yards", # Set plot labels
+       title = "Density Plot of Passing Yards")
+
+g_1
+```
+
+As can be seen from the above plot, the majority of passing yards for QB performance occurs at around 200 yards, and is normally distributed around that point.
+
+Density Plot of QB Rating:
+```{r}
+g_2 <- ggplot(qb_data, aes(x = rate)) + # Set X-axis as insurance charges
+  geom_density(fill = "blue", alpha = 0.3) + # Use geom_density to get density plot
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(x = "QB Rating", # Set plot labels
+       title = "Density Plot of QB Rating")
+
+g_2
+```
+
+QB Rating is around 80-90 typically.
+
+Passing Touchdowns vs Points Scored
+```{r}
+g_3 <- ggplot(qb_data, # Set dataset 
+              aes(y = game_points, # Set y-axis as insurance charges 
+                  x = td)) + # Set x-axis as age.
+  geom_point(color = "blue", alpha = 0.3) + # Use geom_point to get scatter plot
+  theme_bw() + # Set theme for plot
+  theme(panel.grid.major = element_blank(), # Turn of the background grid
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank()) +
+  labs(y = "Game Points", # Set plot labels
+       x = "Touchdown Passes",
+       title = "Touchdown Passes vs Game Points")
+
+g_3
+```
+
+Very clear upward trend from points scored and touchdown passses.
+
+### Random Forest:
+
+Setup:
+```{r}
+library(rpart)
+library(caret)
+library(splitstackshape)
+library(Metrics)
+```
+
+# Regression Model
+```{r}
+qb_model <- rpart(game_points ~.,
+                data = qb_train)
+qb_preds <- predict(qb_model, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+# Bagging Model
+```{r}
+set.seed(111111)
+qb_bag_mod <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200)
+qb_bag_mod
+```
+
+
+# Bagging Model Effectiveness
+```{r}
+qb_preds <- predict(qb_bag_mod, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+# Tuning for Number of Trees
+
+500 Trees
+```{r}
+set.seed(111111)
+qb_bag_mod2 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 500)
+qb_bag_mod2
+qb_preds <- predict(qb_bag_mod2, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+1000 Trees
+```{r}
+set.seed(111111)
+qb_bag_mod3 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 1000)
+qb_bag_mod3
+qb_preds <- predict(qb_bag_mod3, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+100 Trees
+```{r}
+set.seed(111111)
+qb_bag_mod4 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 100)
+qb_bag_mod4
+qb_preds <- predict(qb_bag_mod4, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+# Number of Trees Has Not Affected Much, Look At Node Size
+
+Node Size = 50
+```{r}
+set.seed(111111)
+qb_bag_mod5 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200,
+                           nodesize = 50)
+qb_bag_mod5
+qb_preds <- predict(qb_bag_mod5, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+
+Node size = 100
+```{r}
+set.seed(111111)
+qb_bag_mod6 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200,
+                           nodesize = 100)
+qb_bag_mod6
+qb_preds <- predict(qb_bag_mod6, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+Node size = 200
+```{r}
+set.seed(111111)
+qb_bag_mod7 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200,
+                           nodesize = 200)
+qb_bag_mod7
+qb_preds <- predict(qb_bag_mod7, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+Node size = 500
+```{r}
+set.seed(111111)
+qb_bag_mod8 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200,
+                           nodesize = 500)
+qb_bag_mod8
+qb_preds <- predict(qb_bag_mod8, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+Node size = 1000
+```{r}
+set.seed(111111)
+qb_bag_mod9 <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200,
+                           nodesize = 1000)
+qb_bag_mod9
+qb_preds <- predict(qb_bag_mod9, newdata = qb_test)
+qb_rmse <- rmse(qb_preds, qb_test$game_points)
+cat("RMSE:", round(qb_rmse, 2), "\n")
+```
+
+# Best RMSE was 200 trees, 100 node size.
+
+```{r}
+qb_bag_mod_best <- randomForest(game_points ~.,
+                           data = qb_train,
+                           mtry = 12,
+                           ntree = 200,
+                           nodesize = 100,
+                           importance = TRUE,
+                           proximity = TRUE)
+qb_preds_best <- predict(qb_bag_mod_best, newdata = qb_test)
+qb_rmse_best <- rmse(qb_preds_best, qb_test$game_points)
+cat("RMSE:", round(qb_rmse_best, 2), "\n")
+importance_matrix <- randomForest::importance(qb_bag_mod_best)
+importance_matrix
+```
+
+# Plot Importance
+```{r}
+varImpPlot(qb_bag_mod_best, type = 1, n.var = 10)
+```
+
+### XGBoost
+
+# Setup
+```{r}
+library(xgboost)
+library(caret)
+library(ggplot2)
+library(xgboostExplainer)
+library(pROC)
+library(SHAPforxgboost)
+```
+
+# Convert data to DMatrix
+```{r}
+dtrain <- xgb.DMatrix(data = as.matrix(qb_train[,-11]), label = as.numeric(qb_train$game_points) -1)
+dtest <- xgb.DMatrix(data = as.matrix(qb_test[,-11]), label = as.numeric(qb_test$game_points) - 1)
+```
+
+
+# Training an XGBoost Model
+```{r}
+set.seed(111111)
+bst_1 <- xgboost(data = dtrain,
+                 nrounds = 100,
+                 verbose = 1,
+                 print_every_n = 20)
+```
+
+# Predicting with XGBoost
+```{r}
+boost_preds_1 <- predict(bst_1, dtest)
+
+pred_dat <- cbind.data.frame(boost_preds_1 , qb_test$game_points)
+pred_dat
+
+rmse_pred <- rmse(boost_preds_1, qb_test$game_points)
+rmse_pred
+```
+
+## Tuning XGBoost
+```{r}
+set.seed(111111)
+bst <- xgb.cv(data = dtrain,
+              nfold = 5,
+               eta = 0.1, 
+               nrounds = 1000,
+               early_stopping_rounds = 50,
+               verbose = 1,
+               nthread = 1,
+               print_every_n = 20)
+```
+## Max Depth and Min Child
+```{r}
+max_depth_vals <- c(3, 5, 7, 10, 15) # Create vector of max depth values
+min_child_weight <- c(1,3,5,7, 10, 15) # Create vector of min child values
+
+# Expand grid of parameter values
+cv_params <- expand.grid(max_depth_vals, min_child_weight)
+names(cv_params) <- c("max_depth", "min_child_weight")
+# Create results vector
+rmse_vec <- rep(NA, nrow(cv_params)) 
+# Loop through results
+for(i in 1:nrow(cv_params)){
+  set.seed(111111)
+  bst_tune <- xgb.cv(data = dtrain, # Set training data
+              
+              nfold = 5, # Use 5 fold cross-validation
+               
+              eta = 0.1, # Set learning rate
+              max.depth = cv_params$max_depth[i], # Set max depth
+              min_child_weight = cv_params$min_child_weight[i], # Set minimum number of samples in node to split
+             
+               
+              nrounds = 100, # Set number of rounds
+              early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+               
+              verbose = 1, # 1 - Prints out fit
+              nthread = 1, # Set number of parallel threads
+              print_every_n = 20)
+  rmse_vec[i] <- bst_tune$evaluation_log$train_rmse_mean[bst_tune$best_ntreelimit]
+}
+
+res_db <- cbind.data.frame(cv_params, rmse_vec)
+res_db
+```
+
+Max depth = 15, min child = 1 is best
+
+
+## Gamma Tuning
+```{r}
+gamma_vals <- c(0, 0.05, 0.1, 0.15, 0.2)
+
+set.seed(111111)
+rmse_vec  <- rep(NA, length(gamma_vals))
+for(i in 1:length(gamma_vals)){
+  bst_tune <- xgb.cv(data = dtrain,
+                     nfold = 5,
+                     eta = 0.1,
+                     max.depth = 15,
+                     min_child_weight = 1,
+                     gamma = gamma_vals[i],
+                     nrounds = 100,
+                     early_stopping_rounds = 20,
+                     verbose = 1,
+                     nthread = 1,
+                     print_every_n = 20) 
+  
+  
+  rmse_vec[i] <- bst_tune$evaluation_log$test_rmse_mean[bst_tune$best_ntreelimit]
+}
+
+# Lets view our results to identify the value of gamma to use:
+
+# Gamma results
+# Join gamma to values
+cbind.data.frame(gamma_vals, rmse_vec)
+```
+
+Gamma = 0.15 produces least error, so best
+
+## Subsample and Column Space Tuning
+```{r}
+subsample <- c(0.6, 0.7, 0.8, 0.9, 1) # Create vector of subsample values
+colsample_by_tree <- c(0.6, 0.7, 0.8, 0.9, 1) # Create vector of col sample values
+
+# Expand grid of tuning parameters
+cv_params <- expand.grid(subsample, colsample_by_tree)
+names(cv_params) <- c("subsample", "colsample_by_tree")
+# Create vectors to store results
+rmse_vec <- rep(NA, nrow(cv_params)) 
+# Loop through parameter values
+for(i in 1:nrow(cv_params)){
+  set.seed(111111)
+  bst_tune <- xgb.cv(data = dtrain,
+                     
+                     nfold = 5,
+                     
+                     eta = 0.1,
+                     max.depth = 15,
+                     min_child_weight = 1,
+                     gamma = 0.15,
+                     subsample = cv_params$subsample[i],
+                     colsample_bytree = cv_params$colsample_by_tree[i],
+                     
+                     nrounds = 150,
+                     early_stopping_rounds = 20,
+                     
+                     verbose = 1,
+                     nthread = 1,
+                     print_every_n = 20 
+  )
+  
+  
+  rmse_vec[i] <- bst_tune$evaluation_log$test_rmse_mean[bst_tune$best_ntreelimit]
+}
+res_db <- cbind.data.frame(cv_params, rmse_vec)
+res_db
+```
+
+Subsample = 0.9, column space = 0.6
+
+## Eta Tuning
+```{r}
+set.seed(111111)
+bst_mod_1 <- xgb.cv(data = dtrain, # Set training data
+                    
+                    nfold = 5, # Use 5 fold cross-validation
+                    
+                    eta = 0.3, # Set learning rate
+                    max.depth = 15, # Set max depth
+                    min_child_weight = 1, # Set minimum number of samples in node to split
+                    gamma = 0.15, # Set minimum loss reduction for split
+                    subsample = 0.9, # Set proportion of training data to use in tree
+                    colsample_bytree =  0.6, # Set number of variables to use in each tree
+                    
+                    nrounds = 1000, # Set number of rounds
+                    early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+                    
+                    verbose = 1, # 1 - Prints out fit
+                    nthread = 1, # Set number of parallel threads
+                    print_every_n = 20 # Prints out result every 20th iteration
+)
+
+set.seed(111111)
+bst_mod_2 <- xgb.cv(data = dtrain, # Set training data
+                    
+                    nfold = 5, # Use 5 fold cross-validation
+                    
+                    eta = 0.1, # Set learning rate
+                    max.depth =  15, # Set max depth
+                    min_child_weight = 1, # Set minimum number of samples in node to split
+                    gamma = 0.15, # Set minimum loss reduction for split
+                    subsample = 0.9 , # Set proportion of training data to use in tree
+                    colsample_bytree = 0.6, # Set number of variables to use in each tree
+                    
+                    nrounds = 1000, # Set number of rounds
+                    early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+                    
+                    verbose = 1, # 1 - Prints out fit
+                    nthread = 1, # Set number of parallel threads
+                    print_every_n = 20 # Prints out result every 20th iteration
+) # Set evaluation metric to use
+
+set.seed(111111)
+bst_mod_3 <- xgb.cv(data = dtrain, # Set training data
+                    
+                    nfold = 5, # Use 5 fold cross-validation
+                    
+                    eta = 0.05, # Set learning rate
+                    max.depth = 15, # Set max depth
+                    min_child_weight = 1 , # Set minimum number of samples in node to split
+                    gamma = 0.15, # Set minimum loss reduction for split
+                    subsample = 0.9 , # Set proportion of training data to use in tree
+                    colsample_bytree =  0.6, # Set number of variables to use in each tree
+                    
+                    nrounds = 1000, # Set number of rounds
+                    early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+                    
+                    verbose = 1, # 1 - Prints out fit
+                    nthread = 1, # Set number of parallel threads
+                    print_every_n = 20 # Prints out result every 20th iteration
+) # Set evaluation metric to use
+
+
+set.seed(111111)
+bst_mod_4 <- xgb.cv(data = dtrain, # Set training data
+                    
+                    nfold = 5, # Use 5 fold cross-validation
+                    
+                    eta = 0.01, # Set learning rate
+                    max.depth = 15, # Set max depth
+                    min_child_weight = 1, # Set minimum number of samples in node to split
+                    gamma = 0.15, # Set minimum loss reduction for split
+                    subsample = 0.9 , # Set proportion of training data to use in tree
+                    colsample_bytree = 0.6, # Set number of variables to use in each tree
+                    
+                    nrounds = 1000, # Set number of rounds
+                    early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+                    
+                    verbose = 1, # 1 - Prints out fit
+                    nthread = 1, # Set number of parallel threads
+                    print_every_n = 20 # Prints out result every 20th iteration
+) # Set evaluation metric to use
+
+
+
+set.seed(111111)
+bst_mod_5 <- xgb.cv(data = dtrain, # Set training data
+                    
+                    nfold = 5, # Use 5 fold cross-validation
+                    
+                    eta = 0.005, # Set learning rate
+                    max.depth = 15, # Set max depth
+                    min_child_weight = 1, # Set minimum number of samples in node to split
+                    gamma = 0.15, # Set minimum loss reduction for split
+                    subsample = 0.9 , # Set proportion of training data to use in tree
+                    colsample_bytree = 0.6, # Set number of variables to use in each tree
+                    
+                    nrounds = 1000, # Set number of rounds
+                    early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+                    
+                    verbose = 1, # 1 - Prints out fit
+                    nthread = 1, # Set number of parallel threads
+                    print_every_n = 20) # Prints out result every 20th iteration
+```
+
+## Finding Best Eta Value
+```{r}
+# Extract results for model with eta = 0.3
+pd1 <- cbind.data.frame(bst_mod_1$evaluation_log[,c("iter", "test_rmse_mean")], rep(0.3, nrow(bst_mod_1$evaluation_log)))
+names(pd1)[3] <- "eta"
+# Extract results for model with eta = 0.1
+pd2 <- cbind.data.frame(bst_mod_2$evaluation_log[,c("iter", "test_rmse_mean")], rep(0.1, nrow(bst_mod_2$evaluation_log)))
+names(pd2)[3] <- "eta"
+# Extract results for model with eta = 0.05
+pd3 <- cbind.data.frame(bst_mod_3$evaluation_log[,c("iter", "test_rmse_mean")], rep(0.05, nrow(bst_mod_3$evaluation_log)))
+names(pd3)[3] <- "eta"
+# Extract results for model with eta = 0.01
+pd4 <- cbind.data.frame(bst_mod_4$evaluation_log[,c("iter", "test_rmse_mean")], rep(0.01, nrow(bst_mod_4$evaluation_log)))
+names(pd4)[3] <- "eta"
+# Extract results for model with eta = 0.005
+pd5 <- cbind.data.frame(bst_mod_5$evaluation_log[,c("iter", "test_rmse_mean")], rep(0.005, nrow(bst_mod_5$evaluation_log)))
+names(pd5)[3] <- "eta"
+# Join datasets
+plot_data <- rbind.data.frame(pd1, pd2, pd3, pd4, pd5)
+# Converty ETA to factor
+plot_data$eta <- as.factor(plot_data$eta)
+# Plot points
+g_6 <- ggplot(plot_data, aes(x = iter, y = test_rmse_mean, color = eta))+
+  geom_point(alpha = 0.5) +
+  theme_bw() + # Set theme
+  theme(panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank()) + # Remove grid 
+  labs(x = "Number of Trees", title = "RMSE v Number of Trees",
+       y = "RMSE", color = "Learning \n Rate")  # Set labels
+g_6
+
+# Plot lines
+g_7 <- ggplot(plot_data, aes(x = iter, y = test_rmse_mean, color = eta))+
+  geom_smooth(alpha = 0.5) +
+  theme_bw() + # Set theme
+  theme(panel.grid.major = element_blank(), # Remove grid
+        panel.grid.minor = element_blank(), # Remove grid
+        panel.border = element_blank(), # Remove grid
+        panel.background = element_blank()) + # Remove grid 
+  labs(x = "Number of Trees", title = "RMSE v Number of Trees",
+       y = "RMSE", color = "Learning \n Rate")  # Set labels
+g_7
+```
+
+Eta = 0.1 has least error
+
+## Final Model
+```{r}
+set.seed(111111)
+bst_final <- xgboost(data = dtrain, # Set training data
+                     
+                     
+                     
+                     eta = 0.1, # Set learning rate
+                     max.depth =  15, # Set max depth
+                     min_child_weight = 1, # Set minimum number of samples in node to split
+                     gamma = 0.15, # Set minimum loss reduction for split
+                     subsample =  0.9, # Set proportion of training data to use in tree
+                     colsample_bytree = 0.6, # Set number of variables to use in each tree
+                     
+                     nrounds = 100, # Set number of rounds
+                     early_stopping_rounds = 20, # Set number of rounds to stop at if there is no improvement
+                     
+                     verbose = 1, # 1 - Prints out fit
+                     nthread = 1, # Set number of parallel threads
+                     print_every_n = 20 # Prints out result every 20th iteration
+)
+```
+
+## Tuned Model Performance
+```{r}
+boost_preds_final <- predict(bst_final, dtest)
+
+pred_dat <- cbind.data.frame(boost_preds_final , qb_test$game_points)
+pred_dat
+
+rmse_pred <- rmse(boost_preds_final, qb_test$game_points)
+rmse_pred
+```
+
+## Variable Importance
+```{r}
+imp_mat <- xgb.importance(model = bst_final)
+xgb.plot.importance(imp_mat, top_n = 5)
+```
+
+
+
+
